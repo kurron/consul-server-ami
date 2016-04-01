@@ -1,11 +1,11 @@
 {
     "description": "Builds a Docker enabled Ubuntu 14.04 Server x64 AMI",
-    "min_packer_version": "0.8.6",
+    "min_packer_version": "0.9.0",
 
     "variables": {
         "region": "us-west-2",
         "vpc_id": "vpc-fe24779b",
-        "subnet_id": "subnet-7181c606",
+        "subnet_id": "subnet-0c20be55",
         "source_ami": "ami-5189a661",
         "ssh_username": "ubuntu"
     },
@@ -32,7 +32,8 @@
             "State": "In-Production",
             "Container Support": "Docker",
             "Monitoring Support": "Amazon Cloud Watch",
-            "Logging Support": "Loggly"
+            "Logging Support": "None",
+            "Dedicated Docker Partition": "None"
         }
     }],	
     "provisioners": [
