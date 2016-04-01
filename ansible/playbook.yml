@@ -1,0 +1,80 @@
+---
+- name: Install Docker
+  hosts: localhost
+  become: yes
+  become_method: sudo
+  vars:
+       user_account: ubuntu
+#      This must match the mount point that is used by the LVM creation task
+#      mount_point: /opt/docker
+       mount_point: /var/lib/docker
+  tasks:
+      # have to use cURL because of https://github.com/ansible/ansible/issues/12161
+    - name: Install cURL
+      apt: name=curl state=latest update_cache=true cache_valid_time=600
+    - name: Download Docker Installation Script
+      command: /usr/bin/curl --location --output /root/install-docker https://get.docker.com/ creates=/root/install-docker
+    - name: Set Permission Bits On The Docker Installation Script
+      file: path=/root/install-docker owner=root group=root mode=0500
+    - name: Execute Docker Installation Script
+      shell: /root/install-docker creates=/usr/bin/docker
+    - name: Set Memory and Swap Accounting
+      lineinfile: dest=/etc/default/grub regexp='^GRUB_CMDLINE_LINUX=""' line='GRUB_CMDLINE_LINUX="cgroup_enable=memory swapaccount=1"'
+    - name: Rebuild Grub
+      command: /usr/sbin/update-grub
+    - name: Make some adjustments to the Docker configuration
+      lineinfile: dest=/etc/default/docker line='DOCKER_OPTS="-H unix:///var/run/docker.sock --storage-driver=aufs --log-driver=syslog --graph={{ mount_point }}"'
+    - name: Add account to the docker group 
+      user: name={{ user_account }} groups=docker
+    - name: Restart Docker
+      service: name=docker state=restarted
+    - name: Test Docker
+      command: docker run hello-world
+
+- name: Configure Rsyslog To Forward to Loggly
+  hosts: localhost
+  become: yes
+  become_method: sudo
+  vars:
+       logglyKey: "5fcf8054-54d4-470c-a357-a85c5e918a48"
+       logglyTag: "ecs-fleet"
+  tasks:
+    - name: Copy Rsyslog Configuration File
+      template: src=templates/loggly.conf dest=/etc/rsyslog.d/22-loggly.conf mode=0444 backup=yes force=yes
+    - name: Restart the Rsyslog
+      service: name=rsyslog state=restarted
+    - name: Send a test message
+      command: logger 'Hello From Ansible!'
+
+- name: Install Private Registry Files
+  hosts: localhost
+  become: yes
+  become_method: sudo
+  vars:
+       user_account: ubuntu
+  tasks:
+      - name: Create CA certificates directory
+        file: path=/usr/local/share/ca-certificates/docker-registry state=directory
+      - name: Create SSL certificates directory
+        file: path=/etc/ssl/certs/ state=directory
+      - name: Create SSL certificates directory
+        get_url: >
+                url=http://192.168.254.81:81/artifactory/static/ease/docker-registry/certifcate/registry.transparent.CA.crt
+                dest=/usr/local/share/ca-certificates/docker-registry/registry.transparent.CA.crt
+        register: certificate
+      - name: Add registry to hosts file
+        lineinfile: dest=/etc/hosts line="192.168.254.82 registry.transparent.com"
+      - name: Add cd1 to hosts file
+        lineinfile: dest=/etc/hosts line="192.168.254.81 cd1"
+      - name: Update certificates
+        shell: update-ca-certificates
+        when: certificate|changed
+      - name: Place configuration file into the root account
+        get_url: url=http://192.168.254.81:81/artifactory/static/ease/docker-registry/.dockercfg dest=/root/.dockercfg
+      - name: Place configuration file into the home folder
+        get_url: url=http://192.168.254.81:81/artifactory/static/ease/docker-registry/.dockercfg dest=/home/{{ user_account }}/.dockercfg
+      - name: Set permissions on the home directory
+        file: path=/home/{{ user_account }} owner={{ user_account }} group={{ user_account }} recurse=true state=directory
+      - name: Restart Docker
+        service: name=docker state=restarted
+
