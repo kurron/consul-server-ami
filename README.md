@@ -1,5 +1,5 @@
 #Overview
-This project creates a custom [AWS](http://aws.amazon.com/) image suitable for running as an ECS instance.
+This project creates a custom [AWS](http://aws.amazon.com/) image suitable for running a [Consul](https://www.consul.io/) agent in server mode.
 
 #Prerequisites
 
@@ -21,5 +21,3 @@ This project is a collection of data files consumed by Packer so there is nothin
 
 #License and Credits
 This project operates under the Apache license.
-
-#List of Changes
